@@ -54,16 +54,19 @@ test("update user", async () => {
   }
   const user = await createAdminUser();
   const loginRes = await request(app).put("/api/auth").send(user);
+
   testUserAuthToken = loginRes.body.token;
+
   const updatedUser = {
     ...loginRes.body.user,
     email: Math.random().toString(36).substring(2, 12) + "@test.com",
+    password: user.password,
   };
+
   const updateUserRes = await request(app)
     .put(`/api/auth/${updatedUser.id}`)
     .set("Authorization", `Bearer ${testUserAuthToken}`)
     .send(updatedUser);
-
   expect(updateUserRes.status).toBe(200);
   expect(updateUserRes.body.email).toBe(updatedUser.email);
 });

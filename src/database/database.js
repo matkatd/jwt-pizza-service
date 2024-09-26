@@ -403,7 +403,7 @@ class DB {
   async getConnection() {
     // Make sure the database is initialized before trying to get a connection.
     await this.initialized;
-    return await this._getConnection();
+    return this._getConnection();
   }
 
   async _getConnection(setUse = true) {
