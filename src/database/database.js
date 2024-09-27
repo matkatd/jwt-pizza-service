@@ -415,7 +415,12 @@ class DB {
       decimalNumbers: true,
     });
     if (setUse) {
-      await connection.query(`USE ${config.db.connection.database}`);
+      // use test database if in test mode
+      if (process.env.NODE_ENV === "test") {
+        await connection.query(`USE ${config.db.connection.testDatabase}`);
+      } else {
+        await connection.query(`USE ${config.db.connection.database}`);
+      }
     }
     return connection;
   }
@@ -425,12 +430,20 @@ class DB {
       const connection = await this._getConnection(false);
       try {
         const dbExists = await this.checkDatabaseExists(connection);
-        console.log(dbExists ? "Database exists" : "Database does not exist");
-
         await connection.query(
-          `CREATE DATABASE IF NOT EXISTS ${config.db.connection.database}`
+          `CREATE DATABASE IF NOT EXISTS ${
+            process.env.NODE_ENV === "test"
+              ? config.db.connection.testDatabase
+              : config.db.connection.database
+          }`
         );
-        await connection.query(`USE ${config.db.connection.database}`);
+        await connection.query(
+          `USE ${
+            process.env.NODE_ENV === "test"
+              ? config.db.connection.testDatabase
+              : config.db.connection.database
+          }`
+        );
 
         for (const statement of dbModel.tableCreateStatements) {
           await connection.query(statement);
@@ -462,7 +475,11 @@ class DB {
   async checkDatabaseExists(connection) {
     const [rows] = await connection.execute(
       `SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = ?`,
-      [config.db.connection.database]
+      [
+        process.env.NODE_ENV === "test"
+          ? config.db.connection.testDatabase
+          : config.db.connection.database,
+      ]
     );
     return rows.length > 0;
   }
