@@ -1,7 +1,6 @@
 const request = require("supertest");
 const app = require("../service");
 const { createAdminUser } = require("../helpers/testHelpers");
-// const { DB } = require("../database/database");
 
 const testUser = { name: "pizza diner", email: "reg@test.com", password: "a" };
 let testUserAuthToken;
@@ -60,4 +59,19 @@ test("update user", async () => {
 // afterAll(async () => {
 //   // clean up (drop tables, etc.)
 //   DB.clearTables();
+// });
+
+// test("create admin", async () => {
+//   const admin = await createAdminUser();
+//   const loginRes = await request(app).put("/api/auth").send(admin);
+//   testUserAuthToken = loginRes.body.token;
+
+//   let user = {
+//     name: "admin",
+//     email: "a@jwt.com",
+//     password: "toomanysecrets",
+//     roles: [{ role: Role.Admin }],
+//   };
+
+//   await DB.addUser(user);
 // });
