@@ -38,8 +38,11 @@ class DB {
     try {
       const hashedPassword = await bcrypt.hash(user.password, 10);
 
-
-      const userResult = await this.query(connection, `INSERT INTO user (name, email, password) VALUES (?, ?, ?)`, [user.name, user.email, hashedPassword]);
+      const userResult = await this.query(
+        connection,
+        `INSERT INTO user (name, email, password) VALUES (?, ?, ?)`,
+        [user.name, user.email, hashedPassword]
+      );
       const userId = userResult.insertId;
       for (const role of user.roles) {
         switch (role.role) {
@@ -193,6 +196,7 @@ class DB {
         [user.id, order.franchiseId, order.storeId]
       );
       const orderId = orderResult.insertId;
+      let price = 0;
       for (const item of order.items) {
         const menuId = await this.getID(connection, "id", item.menuId, "menu");
         await this.query(
@@ -200,8 +204,9 @@ class DB {
           `INSERT INTO orderItem (orderId, menuId, description, price) VALUES (?, ?, ?, ?)`,
           [orderId, menuId, item.description, item.price]
         );
+        price += item.price;
       }
-      return { ...order, id: orderId };
+      return { ...order, id: orderId, price: price };
     } finally {
       connection.end();
     }
@@ -382,6 +387,7 @@ class DB {
   }
 
   async query(connection, sql, params) {
+    // TODO: this might be a good place for one of the logs
     const [results] = await connection.execute(sql, params);
     return results;
   }

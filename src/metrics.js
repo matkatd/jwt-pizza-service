@@ -1,6 +1,5 @@
 const os = require("os");
-
-const config = require("./config.json");
+const config = require("./config");
 
 class Metrics {
   constructor() {
@@ -8,38 +7,74 @@ class Metrics {
     this.totalPostRequests = 0;
     this.totalDeleteRequests = 0;
     this.totalGetRequests = 0;
+    this.totalPutRequests = 0;
+
+    this.activeUsers = 0;
+    this.successfulAuthAttempts = 0;
+    this.failedAuthAttempts = 0;
+
+    this.pizzasSold = 0;
+    this.pizzaCreationErrors = 0;
+    this.revenue = 0;
 
     // This will periodically sent metrics to Grafana
     const timer = setInterval(() => {
-      this.postMetricToGrafana("request", "all", "total", this.totalRequests);
-      this.postMetricToGrafana(
+      // MARK: - HTTP Metrics
+      this.sendHTTPMetricToGrafana(
+        "request",
+        "all",
+        "total",
+        this.totalRequests
+      );
+      this.sendHTTPMetricToGrafana(
         "request",
         "get",
         "total",
         this.totalGetRequests
       );
-      this.postMetricToGrafana(
+      this.sendHTTPMetricToGrafana(
         "request",
         "post",
         "total",
         this.totalPostRequests
       );
-      this.postMetricToGrafana(
+      this.sendHTTPMetricToGrafana(
         "request",
         "delete",
         "total",
         this.totalDeleteRequests
       );
-
-      this.postMetricToGrafana(
-        "cpu",
-        "",
-        "cpuUsage",
-        this.getCpuUsagePercentage()
+      this.sendHTTPMetricToGrafana(
+        "request",
+        "put",
+        "total",
+        this.totalPutRequests
       );
-      this.postMetricToGrafana(
+
+      // MARK: - Auth Metrics
+      this.sendMetricToGrafana(
+        "auth",
+        "successful",
+        this.successfulAuthAttempts
+      );
+      this.sendMetricToGrafana("auth", "failed", this.failedAuthAttempts);
+
+      // MARK: - User Metrics
+      this.sendMetricToGrafana("user", "active", this.activeUsers);
+
+      // MARK: - Pizza Metrics
+      this.sendMetricToGrafana("pizza", "sold", this.pizzasSold);
+      this.sendMetricToGrafana(
+        "pizza",
+        "creationErrors",
+        this.pizzaCreationErrors
+      );
+      this.sendMetricToGrafana("pizza", "revenue", this.revenue);
+
+      // MARK: - System Metrics
+      this.sendMetricToGrafana("cpu", "cpuUsage", this.getCpuUsagePercentage());
+      this.sendMetricToGrafana(
         "memory",
-        "",
         "memoryUsage",
         this.getMemoryUsagePercentage()
       );
@@ -59,22 +94,53 @@ class Metrics {
   incrementDeleteRequests() {
     this.totalDeleteRequests++;
   }
+  incrementPutRequests() {
+    this.totalPutRequests++;
+  }
+
+  incrementSuccessfulAuthAttempts() {
+    this.successfulAuthAttempts++;
+  }
+  incrementFailedAuthAttempts() {
+    this.failedAuthAttempts++;
+  }
+
+  incrementActiveUsers() {
+    this.activeUsers++;
+  }
+  decrementActiveUsers() {
+    if (this.activeUsers > 0) {
+      this.activeUsers--;
+    }
+  }
+
+  incrementPizzasSold() {
+    this.pizzasSold++;
+  }
+  incrementPizzaCreationErrors() {
+    this.pizzaCreationErrors++;
+  }
+  incrementRevenue(amount) {
+    this.revenue += amount;
+  }
 
   sendHTTPMetricToGrafana(metricPrefix, httpMethod, metricName, metricValue) {
-    const metric = `${metricPrefix},source=${config.source},method=${httpMethod} ${metricName}=${metricValue}`;
+    const metric = `${metricPrefix},source=${config.metrics.source},method=${httpMethod} ${metricName}=${metricValue}`;
     this.uploadMetricToGrafana(metric);
   }
 
-  postMetricToGrafana(metricPrefix, metricName, metricValue) {
-    const metric = `${metricPrefix},source=${config.source} ${metricName}=${metricValue}`;
+  sendMetricToGrafana(metricPrefix, metricName, metricValue) {
+    const metric = `${metricPrefix},source=${config.metrics.source} ${metricName}=${metricValue}`;
     this.uploadMetricToGrafana(metric);
   }
 
   uploadMetricToGrafana(metric) {
-    fetch(`${config.url}`, {
+    fetch(`${config.metrics.url}`, {
       method: "post",
       body: metric,
-      headers: { Authorization: `Bearer ${config.userId}:${config.apiKey}` },
+      headers: {
+        Authorization: `Bearer ${config.metrics.userId}:${config.metrics.apiKey}`,
+      },
     })
       .then((response) => {
         if (!response.ok) {
@@ -101,7 +167,17 @@ class Metrics {
     return memoryUsage.toFixed(2);
   }
 
+  requestLatencyTracker(req, res, next) {
+    const start = Date.now();
+    res.on("finish", () => {
+      const duration = Date.now() - start;
+      metrics.sendMetricToGrafana("request", "latency", duration);
+    });
+    next();
+  }
+
   requestTracker(req, res, next) {
+    console.log("Method", req.method);
     metrics.incrementRequests();
     if (req.method === "GET") {
       metrics.incrementeGetRequests();
@@ -109,6 +185,8 @@ class Metrics {
       metrics.incrementPostRequests();
     } else if (req.method === "DELETE") {
       metrics.incrementDeleteRequests();
+    } else if (req.method === "PUT") {
+      metrics.incrementPutRequests();
     }
     next();
   }

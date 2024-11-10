@@ -8,6 +8,8 @@ const metrics = require("./metrics.js");
 
 const app = express();
 app.use(express.json());
+app.use(metrics.requestTracker);
+app.use(metrics.requestLatencyTracker);
 app.use(setAuthUser);
 app.use((req, res, next) => {
   res.setHeader("Access-Control-Allow-Origin", req.headers.origin || "*");
@@ -18,6 +20,7 @@ app.use((req, res, next) => {
 });
 
 const apiRouter = express.Router();
+
 app.use("/api", apiRouter);
 apiRouter.use("/auth", authRouter);
 apiRouter.use("/order", orderRouter);
@@ -55,7 +58,5 @@ app.use((err, req, res, next) => {
     .json({ message: err.message, stack: err.stack });
   next();
 });
-
-app.use(metrics.requestTracker);
 
 module.exports = app;
