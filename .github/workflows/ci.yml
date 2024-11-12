@@ -65,6 +65,12 @@ jobs:
               url: '${{ secrets.METRICS_URL }}',
               apiKey: '${{ secrets.METRICS_API_KEY }}',
             }, 
+            logging: {
+            source: 'jwt-pizza-service',
+            userId: ${{ secrets.LOGGING_USER_ID }},
+            url: '${{ secrets.LOGGING_URL }}',
+            apiKey: '${{ secrets.LOGGING_API_KEY }}',
+            },
           };" > src/config.js
 
       - name: Tests
@@ -77,6 +83,9 @@ jobs:
           echo "version=$version" >> "$GITHUB_OUTPUT"
           printf '{"version": "%s" }' "$version" > src/version.json
 
+      - name: Annotate deployment in Grafana
+        run: |
+          curl -s -X POST https://matkatd.grafana.net/api/annotations -H "Authorization: Bearer ${{ secrets.GRAFANA_ACCESS_TOKEN }}" -H "Content-Type:application/json" -d '{"dashboardUID":"de2kqabtd5p8ge", "panelId":14, "tags":["backend","production"], "text":"Version '"$version"' deployed" }'
       - name: Update coverage
         run: |
           coverage_pct=$(grep -o '"pct":[0-9.]*' coverage/coverage-summary.json | head -n 1 | cut -d ':' -f 2)
