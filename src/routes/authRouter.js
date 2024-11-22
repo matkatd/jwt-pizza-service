@@ -1,7 +1,7 @@
 const express = require("express");
 const jwt = require("jsonwebtoken");
 const config = require("../config.js");
-const { asyncHandler } = require("../endpointHelper.js");
+const { asyncHandler, StatusCodeError } = require("../endpointHelper.js");
 const { DB, Role } = require("../database/database.js");
 const metrics = require("../metrics.js");
 
@@ -114,11 +114,14 @@ authRouter.put(
   "/",
   asyncHandler(async (req, res) => {
     console.log("login");
+    if (enableChaos) {
+      // make it wait 30 seconds
+      await new Promise((resolve) => setTimeout(resolve, 30000));
+    }
     const { email, password } = req.body;
     const user = await DB.getUser(email, password);
     const auth = await setAuth(user);
-    console.log("login success with token", auth);
-    console.log("user", user);
+
     res.json({ user: user, token: auth });
   })
 );
@@ -148,6 +151,22 @@ authRouter.put(
 
     const updatedUser = await DB.updateUser(userId, email, password);
     res.json(updatedUser);
+  })
+);
+
+let enableChaos = false;
+
+// chaos
+authRouter.put(
+  "/chaos/:state",
+  authRouter.authenticateToken,
+  asyncHandler(async (req, res) => {
+    if (!req.user.isRole(Role.Admin)) {
+      throw new StatusCodeError("unknown endpoint", 404);
+    }
+
+    enableChaos = req.params.state === "true";
+    res.json({ chaos: enableChaos });
   })
 );
 
